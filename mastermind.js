@@ -1,4 +1,5 @@
 const G = require('generatorics');
+const os = require('os');
 
 function range(from, to) {
     let range_arr = [];
@@ -14,20 +15,28 @@ class Mastermind {
     constructor(slots) {
         this.set = new Set(range(1,slots));
         this.slots = slots;
+        this.set_arr = () => Array.from(this.set_map.keys());
+        this.set_map = new Map();
+    }
 
+    generateMap(slots) {
+        let tmp = new Map();
+        for (let i = 0; i < slots; ++i) {
+            tmp[i + 1] = 1;
+        }
+        return tmp;
     }
 
     removeFromSet(numbers) {
         let removed = [];
 
         for (let i = 0; i < numbers.length; ++i) {
-            if (this.set.has(numbers[i])) {
-                this.set.delete(numbers[i]);
-                removed.push(numbers[i]);
-            }
+            this.set.delete(numbers[i]);
+            this.set_map.delete(numbers[i]);
+            removed.push(numbers[i]);
         }
 
-        return removed;
+        return [...new Set(removed)];
     }
 
     singleNumberGuess(num) {
@@ -62,6 +71,23 @@ class Mastermind {
 
         return (tmp_black === black && tmp_white === white)
 
+    }
+
+    nextGuess(last_guess, last_num_i, slot_i) {
+        let new_guess = last_guess.slice(0);
+        new_guess[slot_i] = this.set_arr()[last_num_i + 1];
+
+        return new_guess;
+    }
+
+    checkPins(black, white, guess) {
+        if (black === 100) {
+            console.log('DONE!!');
+            os.exit();
+        } else if (black === 0 && white === 0) {
+            console.log('Removed: ' + this.removeFromSet([guess[0]]));
+            return false;
+        }
     }
 }
 

@@ -1,52 +1,84 @@
 const os = require('os');
+const cli = require('pixl-cli');
 const EtneteraAPI = require('./etn_api');
 const Mastermind = require('./mastermind');
-
-const check_pins = (white, black,guess, mm) => {
-    if (black === 100) {
-        console.log('DONE!!');
-        os.exit();
-    } else if (black === 0 && white === 0) {
-        console.log('Removed: ' + mm.removeFromSet(guess));
-        return false;
-    }
-};
 
 async function main() {
     const etn = new EtneteraAPI('tajnymag', 'tajnymag+hravahlava@gmail.com', 100);
     const mm = new Mastermind(100);
-    let attempt = 0;
 
     await etn.start();
 
-    let done = false;
-
+    cli.print('Throwing away numbers not included in the secret code...\n');
+    cli.progress.start({
+        max: 100,
+        amount: 100,
+        width: cli.width() - 27,
+        catchInt: true,
+        catchTerm: true,
+        catchCrash: true,
+        exitOnSig: true
+    });
     for (let num of mm.set) {
         const guess = mm.singleNumberGuess(num);
         const res = await etn.guess(guess);
-        console.log('Tested singleNumber: ' + num);
-        check_pins(res.white, res.black, guess, mm);
-        attempt++;
+
+        //console.log(`Tested singleNumber: ${num} with blacks: ${res.black} and whites: ${res.white}`);
+
+        mm.set_map.set(num, res.black);
+
+        if (res.black === 0 && res.white === 0) {
+            mm.removeFromSet([guess[0]]);
+            cli.progress.update(100 - mm.set_arr().length);
+        }
     }
+    cli.progress.erase();
+    cli.print('Cut the possible set of numbers down to ' + cli.bold.red(mm.set_arr().length) + '!\n\n');
+    cli.print("We're now in phase 2 of 2: Testing possible combinations...\n");
+    cli.progress.draw();
 
-    while (!done) {
-        const possible_guesses = mm.allPossible();
-        let last_guess = [];
-        let last_res = {};
+    let last_guess = mm.singleNumberGuess(mm.set_arr()[0]);
+    let last_res = await etn.guess(last_guess);
 
-        for (let guess of possible_guesses) {
-            if (last_guess !== [] && last_res !== {} && !mm.sameResult(last_guess, guess, last_res.white, last_res.black)) {
-                continue;
+    for (let i = 0; i < mm.slots; ++i) {
+        let guess = last_guess;
+        let res = last_res;
+        let item = 0;
+
+        while (true) {
+            guess = mm.nextGuess(last_guess, (item++ % mm.set_arr().length) - 1, i);
+
+            res = await etn.guess(guess);
+
+            /**
+             * console.log(`Tested: pos=${i} black=${res.black} number=${guess[i]} setsize=${mm.set_map.size}/${mm.set_arr().length}/${mm.set.size}`);
+             console.log(JSON.stringify(guess));
+             */
+
+            if (res.black > last_res.black) {
+                cli.progress.update(i);
+
+                last_res = res;
+                last_guess = guess;
+
+                const tmp_key = guess[i];
+                const tmp_val = mm.set_map.get(tmp_key);
+
+                mm.set_map.set(tmp_key, tmp_val - 1);
+                if (mm.set_map.get(tmp_key) <= 0) {
+                    mm.removeFromSet([tmp_key]);
+                }
+                break;
+            } else {
+                last_res = res;
+                last_guess = guess;
             }
+        }
 
-            const res = await etn.guess(guess);
-            last_guess = guess;
-            last_res = { white: res.white, black: res.black };
-
-            console.log('Tested: ' + guess);
-            console.log(res.white, res.black);
-
-            done = check_pins(res.white, res.black, guess, mm);
+        if (last_res.black === mm.slots) {
+            cli.progress.end();
+            cli.print(cli.bold.green('DONE!!!\n'));
+            break;
         }
     }
 }
