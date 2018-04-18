@@ -5,7 +5,7 @@ class EtneteraAPI {
         this.nickname = nickname;
         this.email = email;
         this.slots = slots;
-        this.base_url = 'https://ikariera.etnetera.cz/veletrhy'
+        this.base_url = 'https://ikariera.etnetera.cz/veletrhy';
         this.gameId = null;
     }
 

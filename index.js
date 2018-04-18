@@ -1,4 +1,3 @@
-const os = require('os');
 const cli = require('pixl-cli');
 const EtneteraAPI = require('./etn_api');
 const Mastermind = require('./mastermind');
